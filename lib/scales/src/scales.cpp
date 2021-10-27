@@ -1,4 +1,4 @@
-#include "Scales.h"
+#include "scales.h"
 
 #include <Arduino.h>
 
@@ -21,7 +21,7 @@
 // Single clock cycle delay
 #define NOP __asm__ __volatile__("nop\n\t")
 
-namespace Scales
+namespace scales
 {
     void init()
     {

@@ -1,7 +1,7 @@
 #ifndef SCALES_H
 #define SCALES_H
 
-namespace Scales
+namespace scales
 {
     struct Reading
     {

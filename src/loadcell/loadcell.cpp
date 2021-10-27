@@ -4,16 +4,16 @@
 void setup()
 {
     pinMode(LED_BUILTIN, OUTPUT);
-    Scales::init();
+    scales::init();
     Serial.begin(115200);
     delay(1000);
-    Scales::setPower(true);
+    scales::setPower(true);
 }
 
 void loop()
 {
     delay(1000);
-    Scales::Reading reading = Scales::readOnce();
+    scales::Reading reading = scales::readOnce();
 
     Serial.print("X: "); // Axial
     Serial.println(reading.x);
