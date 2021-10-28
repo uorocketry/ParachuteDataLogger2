@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <scales.h>
+#include "scales.h"
 
 void setup()
 {
