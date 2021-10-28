@@ -8,6 +8,7 @@ namespace board_comm
 {
     enum Address
     {
+        NONE,
         ANEMOMETER,
         LOADCELL
     };
@@ -23,7 +24,7 @@ namespace board_comm
         ZERO,
     };
 
-    void init(Address address, void (*recieveCommandCallback)(Command command));
+    void init(Address address, void (*recieveCallback)(Command command, Address address));
     void transmit(Address address, Command command);
     void transmit(Address address, Command command, uint8_t *data, size_t len);
     void transmit(Address address, Command command, float *data, size_t len);

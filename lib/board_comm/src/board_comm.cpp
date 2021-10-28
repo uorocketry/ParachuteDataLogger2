@@ -7,17 +7,18 @@
 
 namespace board_comm
 {
-    uint8_t address;
-    void (*recieveCallback)(Command command);
+    uint8_t thisAddress;
+    void (*recieveCallback)(Command command, Address address);
 
-    void init(Address address, void (*recieveCommandCallback)(Command))
+    void init(Address address, void (*recieveCallback)(Command, Address))
     {
+        board_comm::thisAddress = address;
+        board_comm::recieveCallback = recieveCallback;
         pinMode(DI2C_EN, OUTPUT);
         digitalWrite(DI2C_EN, HIGH);
         Wire.setTimeout(400);
         Wire.begin((uint8_t)address);
         Wire.onReceive(onRecieve);
-        recieveCallback = recieveCommandCallback;
     }
 
     // Transmit a command
@@ -25,6 +26,7 @@ namespace board_comm
     {
         Wire.beginTransmission((uint8_t)address);
         Wire.write((uint8_t)command);
+        Wire.write((uint8_t)thisAddress);
         Wire.endTransmission();
     }
 
@@ -33,6 +35,7 @@ namespace board_comm
     {
         Wire.beginTransmission((uint8_t)address);
         Wire.write((uint8_t)command);
+        Wire.write((uint8_t)thisAddress);
         Wire.write(data, len);
         Wire.endTransmission();
     }
@@ -43,11 +46,15 @@ namespace board_comm
         transmit(address, command, (uint8_t *)data, len*4);
     }
 
-    // Call callback with the recieved command (the first byte in the message)
+    // Call callback with the recieved command and sender address
     void onRecieve(int len)
     {
-        if (Wire.available())
-            recieveCallback((Command)Wire.read());
+        if (Wire.available() < 2)
+            return;
+
+        Command command = (Command)Wire.read();
+        Address address = (Address)Wire.read();
+        recieveCallback(command, address);
     }
 
     // Read the specified number of bytes into the buffer
