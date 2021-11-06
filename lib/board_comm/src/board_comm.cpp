@@ -21,23 +21,21 @@ namespace board_comm
         Wire.onReceive(onRecieve);
     }
 
-    // Transmit a command
-    void transmit(Address address, Command command)
-    {
-        Wire.beginTransmission((uint8_t)address);
-        Wire.write((uint8_t)command);
-        Wire.write((uint8_t)thisAddress);
-        Wire.endTransmission();
-    }
-
     // Transmit a command and data
     void transmit(Address address, Command command, uint8_t *data, size_t len)
     {
         Wire.beginTransmission((uint8_t)address);
         Wire.write((uint8_t)command);
         Wire.write((uint8_t)thisAddress);
-        Wire.write(data, len);
+        if (len > 0)
+            Wire.write(data, len);
         Wire.endTransmission();
+    }
+
+    // Transmit a command
+    void transmit(Address address, Command command)
+    {
+        transmit(address, command, (uint8_t *)nullptr, 0);
     }
 
     // Transmit a command and data

@@ -3,14 +3,10 @@
 #include "scales.h"
 
 board_comm::Address pingResponse = board_comm::NONE;
+bool logging = false;
 
 void onRecieveCommand(board_comm::Command command, board_comm::Address address)
 {
-    Serial.print("Recieved command ");
-    Serial.print(command);
-    Serial.print(" from ");
-    Serial.println(address);
-
     if (command == board_comm::PING)
         pingResponse = address;
 }
@@ -30,11 +26,14 @@ void loop()
 {
     if (pingResponse != board_comm::NONE)
     {
-        board_comm::transmit((board_comm::Address)pingResponse, board_comm::RESPONSE);
+        digitalWrite(LED_BUILTIN, HIGH);
+        board_comm::transmit(pingResponse, board_comm::RESPONSE);
         pingResponse = board_comm::NONE;
     }
+}
 
-    delay(1000);
+void getScales()
+{
     scales::Reading reading = scales::readOnce();
 
     Serial.print("X: "); // Axial
