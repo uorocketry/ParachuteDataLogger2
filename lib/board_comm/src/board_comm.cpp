@@ -44,6 +44,18 @@ namespace board_comm
         transmit(address, command, (uint8_t *)data, len*4);
     }
 
+    // Transmit a command and scale reading
+    void transmit(Address address, Command command, Reading reading)
+    {
+        Wire.beginTransmission((uint8_t)address);
+        Wire.write((uint8_t)command);
+        Wire.write((uint8_t)thisAddress);
+        Wire.write((uint8_t *)(&reading.x), 4);
+        Wire.write((uint8_t *)(&reading.y), 4);
+        Wire.write((uint8_t *)(&reading.z), 4);
+        Wire.endTransmission();
+    }
+
     // Call callback with the recieved command and sender address
     void onRecieve(int len)
     {
@@ -56,8 +68,8 @@ namespace board_comm
     }
 
     // Read the specified number of bytes into the buffer
-    // Call this function after onRecieve to get any data sent after the command
-    bool read(uint8_t *buffer, size_t len) 
+    // This function does not flush the buffer after reading
+    bool readRaw(uint8_t *buffer, size_t len)
     {
         for (size_t i = 0; i < len; i++)
         {
@@ -65,7 +77,13 @@ namespace board_comm
                 return false;
             buffer[i] = Wire.read();
         }
+        return true;
+    }
 
+    // Clear the wire buffer
+    // Returns true if buffer is already empty
+    bool flush()
+    {
         if (!Wire.available())
             return true;
 
@@ -75,10 +93,37 @@ namespace board_comm
         return false;
     }
 
+    // Read the specified number of bytes into the buffer
+    // Call this function after onRecieve to get any data sent after the command
+    bool read(uint8_t *buffer, size_t len) 
+    {
+        if (!readRaw(buffer, len))
+            return false;
+        return flush();
+    }
+
     // Read the specified number of floats into the buffer
     // Call this function after onRecieve to get any data sent after the command
     bool read(float *buffer, size_t len)
     {
         return read((uint8_t *)buffer, len*4);
+    }
+
+    // Read a scale reading from the buffer
+    // Call this function after onRecieve to get any data sent after the command
+    bool read(Reading &reading)
+    {
+        uint8_t *readingX = (uint8_t *)&reading.x;
+        uint8_t *readingY = (uint8_t *)&reading.y;
+        uint8_t *readingZ = (uint8_t *)&reading.z;
+
+        if (!readRaw(readingX, 4))
+            return false;
+        if (!readRaw(readingY, 4))
+            return false;
+        if (!readRaw(readingZ, 4))
+            return false;
+
+        return flush();
     }
 }

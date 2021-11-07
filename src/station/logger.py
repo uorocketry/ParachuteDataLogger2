@@ -4,8 +4,9 @@ from time import sleep
 
 class Command:
     PING = bytes([1])
-    START_LOGGING = bytes([2])
-    STOP_LOGGING = bytes([3])
+    READ_SINGLE = bytes([2])
+    START_LOGGING = bytes([3])
+    STOP_LOGGING = bytes([4])
 
 ser = serial.Serial()
 
@@ -46,14 +47,27 @@ def ping():
         if ser.inWaiting() > 0:
             if ser.read(1) == Command.PING:
                 while ser.inWaiting() > 0:
-                    ser.read() # Clear buffer
+                    ser.read() # Flush buffer
                 return True
         elif time.time() - start_time > 2:
             print('Request timed out')
             return False
 
 def read_single():
-    print('Command not implemented')
+    start_time = time.time()
+    ser.write(Command.READ_SINGLE)
+    while(True):
+        if ser.inWaiting() >= 12:
+            x = int.from_bytes(ser.read(4), byteorder='little', signed=True)
+            y = int.from_bytes(ser.read(4), byteorder='little', signed=True)
+            z = int.from_bytes(ser.read(4), byteorder='little', signed=True)
+            print(x)
+            print(y)
+            print(z)
+            return True
+        elif time.time() - start_time > 2:
+            print('Request timed out')
+            return False
 
 def start_logging():
     print('Command not implemented')
@@ -83,7 +97,8 @@ if __name__ == '__main__':
     if ping():
         print('Connections OK')
     else:
-        print('Check board connections before continuing')
+        print('Check board connections and try again')
+        raise SystemExit
 
     while get_input():
         continue

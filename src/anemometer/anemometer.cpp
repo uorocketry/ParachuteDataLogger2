@@ -1,12 +1,17 @@
 #include <Arduino.h>
 #include <board_comm.h>
 
+bool sendReading = false;
 bool sendPingResponse = false;
 void onRecieveCommand(board_comm::Command command, board_comm::Address address)
 {
-    if (command == board_comm::RESPONSE && address == board_comm::LOADCELL)
+    if (command == board_comm::PING_RESPONSE && address == board_comm::LOADCELL)
     {
         sendPingResponse = true;
+    }
+    else if (command == board_comm::READING && address == board_comm::LOADCELL)
+    {
+        sendReading = true;
     }
 }
 
@@ -15,9 +20,20 @@ void readSerial()
 {
     if(Serial.available())
     {
-        if (Serial.read() == 1)
+        switch (Serial.read())
         {
+        case 1:
             board_comm::transmit(board_comm::LOADCELL, board_comm::PING);
+            break;
+        case 2:
+            board_comm::transmit(board_comm::LOADCELL, board_comm::READ_SINGLE);
+            break;
+        case 3:
+            board_comm::transmit(board_comm::LOADCELL, board_comm::START_LOGGING);
+            break;
+        case 4:
+            board_comm::transmit(board_comm::LOADCELL, board_comm::STOP_LOGGING);
+            break;
         }
     }
 }
@@ -27,7 +43,6 @@ void setup()
     Serial.begin(115200);
     pinMode(LED_BUILTIN, OUTPUT);
     board_comm::init(board_comm::ANEMOMETER, onRecieveCommand);
-    digitalWrite(LED_BUILTIN, HIGH);
 }
 
 void writeSerial()
@@ -36,6 +51,18 @@ void writeSerial()
     {
         Serial.write(1);
         sendPingResponse = false;
+    }
+    else if (sendReading)
+    {
+        board_comm::Reading reading;
+        board_comm::read(reading);
+
+        digitalWrite(LED_BUILTIN, HIGH);
+
+        Serial.write((uint8_t *)(&reading.x), 4);
+        Serial.write((uint8_t *)(&reading.y), 4);
+        Serial.write((uint8_t *)(&reading.z), 4);
+        sendReading = false;
     }
 }
 

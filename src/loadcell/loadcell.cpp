@@ -3,12 +3,14 @@
 #include "scales.h"
 
 board_comm::Address pingResponse = board_comm::NONE;
-bool logging = false;
+bool readOnce = false;
 
 void onRecieveCommand(board_comm::Command command, board_comm::Address address)
 {
     if (command == board_comm::PING)
         pingResponse = address;
+    if (command == board_comm::READ_SINGLE)
+        readOnce = true;
 }
 
 void setup()
@@ -16,9 +18,6 @@ void setup()
     pinMode(LED_BUILTIN, OUTPUT);
     scales::init();
     board_comm::init(board_comm::LOADCELL, onRecieveCommand);
-    Serial.begin(115200);
-
-    delay(1000);
     scales::setPower(true);
 }
 
@@ -26,21 +25,13 @@ void loop()
 {
     if (pingResponse != board_comm::NONE)
     {
-        digitalWrite(LED_BUILTIN, HIGH);
-        board_comm::transmit(pingResponse, board_comm::RESPONSE);
+        board_comm::transmit(pingResponse, board_comm::PING_RESPONSE);
         pingResponse = board_comm::NONE;
     }
-}
-
-void getScales()
-{
-    scales::Reading reading = scales::readOnce();
-
-    Serial.print("X: "); // Axial
-    Serial.println(reading.x);
-    Serial.print("Y: "); // Vertical
-    Serial.println(reading.y);
-    Serial.print("Z: "); // Horizontal
-    Serial.println(reading.z);
-    Serial.println("---");
+    else if (readOnce)
+    {
+        board_comm::Reading reading = scales::readOnce();
+        board_comm::transmit(board_comm::ANEMOMETER, board_comm::READING, reading);
+        readOnce = false;
+    }
 }

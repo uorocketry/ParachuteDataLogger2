@@ -42,9 +42,9 @@ namespace scales
         return true;
     }
 
-    Reading readOnce()
+    board_comm::Reading readOnce()
     {
-        Reading value;
+        board_comm::Reading value;
         if (!scalesReady())
             return value;
 
