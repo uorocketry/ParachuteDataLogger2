@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <board_comm.h>
-#include "scales.h"
+#include <scales.h>
 
 board_comm::Address pingResponse = board_comm::NONE;
 bool readOnce = false;

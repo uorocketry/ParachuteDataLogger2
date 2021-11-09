@@ -33,12 +33,12 @@ namespace scales
 
     void setPower(bool on)
     {
-        digitalWrite(SCK, on);
+        digitalWrite(SCK, !on);
     }
 
     bool scalesReady()
     {
-        //return !((PIN_X & BIT_X) || (PIN_Y & BIT_Y) || (PIN_Z & BIT_Z));
+        return !(PIN_X & BIT_X) && !(PIN_Y & BIT_Y) && !(PIN_Z & BIT_Z);
         return true;
     }
 
