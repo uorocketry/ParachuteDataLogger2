@@ -1,12 +1,24 @@
 import serial
 import time
 from time import sleep
-
+import os
+import re
+from threading import Thread
+import csv
 class Command:
     PING = bytes([1])
     READ_SINGLE = bytes([2])
     START_LOGGING = bytes([3])
     STOP_LOGGING = bytes([4])
+
+class Reading:
+    def __init__(self, x, y, z):
+        self.x = x
+        self.y = y
+        self.z = z
+    
+    def __str__(self):
+        return 'X:{0} Y:{1} Z:{2}'.format(self.x, self.y, self.z)
 
 ser = serial.Serial()
 
@@ -37,8 +49,42 @@ def get_input():
         elif result == '4':
             return False # Exit
         else:
-            continue # Invalid input, Continue
+            continue # Invalid input, Continue get_input loop
         return True # Keep looping
+
+def ask_yes_no(question):
+    while True:
+        response = input('{} (Y/N)\n'.format(question)).strip().capitalize()
+        if response == 'Y':
+            return True
+        elif response == 'N':
+            return False
+
+def open_log_file():
+    log_dir = os.path.join(os.path.dirname(__file__), 'logs')
+    if not os.path.isdir(log_dir):
+        os.mkdir(log_dir)
+        print('Created log directory {}'.format(log_dir))
+
+    while True:
+        log_file = input('Enter file name\n').strip()
+        if re.match('^[\\w\\-. ]+$', log_file) == None:
+            print('Invalid file name')
+            continue
+
+        log_path = os.path.join(log_dir, log_file + '.csv')
+        if os.path.isfile(log_path) and not ask_yes_no('File already exists. Overwrite?'):
+            continue
+
+        try:
+            log = open(log_path, 'w')
+            log.close()
+        except Exception as e:
+            print('Error opening log file for writing: {}'.format(e))
+            continue
+
+        print('Log will be saved as {}'.format(log_path))
+        return open(log_path, 'a+')
 
 def ping():
     start_time = time.time()
@@ -53,27 +99,64 @@ def ping():
             print('Request timed out')
             return False
 
+def read_loadcells():
+    return Reading(
+        int.from_bytes(ser.read(4), byteorder='little', signed=True),
+        int.from_bytes(ser.read(4), byteorder='little', signed=True),
+        int.from_bytes(ser.read(4), byteorder='little', signed=True))
+
 def read_single():
     start_time = time.time()
     ser.write(Command.READ_SINGLE)
     while(True):
         if ser.inWaiting() >= 12:
-            x = int.from_bytes(ser.read(4), byteorder='little', signed=True)
-            y = int.from_bytes(ser.read(4), byteorder='little', signed=True)
-            z = int.from_bytes(ser.read(4), byteorder='little', signed=True)
-            print(x)
-            print(y)
-            print(z)
+            print(read_loadcells())
             return True
         elif time.time() - start_time > 2:
             print('Request timed out')
             return False
 
+stop_read = True
+logging_thread = Thread()
+def read_continuous(log_file):
+    global stop_read
+    stop_read = False
+    csv_writer = csv.writer(log_file)
+
+    start_time = time.time()
+    latest_time = start_time
+
+    ser.write(Command.READ_SINGLE) # TODO: change this to Command.START_LOGGING
+    while(True):
+        if ser.inWaiting() >= 12:
+            reading = read_loadcells()
+            csv_writer.writerow([round(time.time() - start_time, 6), reading.x, reading.y, reading.z])
+
+            latest_time = time.time()
+
+        elif time.time() - latest_time > 2:
+            print('Connection timed out')
+            log_file.close()
+            stop_read = True
+            return False
+        elif stop_read:
+            log_file.close()
+            print('Logging stopped')
+            return True
+
 def start_logging():
-    print('Command not implemented')
+    log_file = open_log_file()
+    global logging_thread
+    logging_thread = Thread(target=read_continuous, args=(log_file,))
+    logging_thread.start()
 
 def stop_logging():
-    print('Command not implemented')
+    global stop_read
+    if not stop_read:
+        stop_read = True
+        logging_thread.join()
+    else:
+        print('Not currently logging')
 
 if __name__ == '__main__':
     availablePorts = get_serial_ports()
