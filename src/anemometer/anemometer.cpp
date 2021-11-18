@@ -3,16 +3,14 @@
 
 bool sendReading = false;
 bool sendPingResponse = false;
+bool ledToggle = false;
+
 void onRecieveCommand(board_comm::Command command, board_comm::Address address)
 {
-    if (command == board_comm::PING_RESPONSE && address == board_comm::LOADCELL)
-    {
+    if (command == board_comm::PING_RESPONSE)
         sendPingResponse = true;
-    }
-    else if (command == board_comm::READING && address == board_comm::LOADCELL)
-    {
+    else if (command == board_comm::READING)
         sendReading = true;
-    }
 }
 
 // Read a single byte command sent over serial
@@ -57,7 +55,8 @@ void writeSerial()
         board_comm::Reading reading;
         board_comm::read(reading);
 
-        digitalWrite(LED_BUILTIN, HIGH);
+        digitalWrite(LED_BUILTIN, ledToggle);
+        ledToggle = !ledToggle;
 
         Serial.write((uint8_t *)(&reading.x), 4);
         Serial.write((uint8_t *)(&reading.y), 4);

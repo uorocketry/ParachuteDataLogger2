@@ -4,6 +4,8 @@
 
 board_comm::Address pingResponse = board_comm::NONE;
 bool readOnce = false;
+bool logging = false;
+bool ledToggle = false;
 
 void onRecieveCommand(board_comm::Command command, board_comm::Address address)
 {
@@ -11,6 +13,10 @@ void onRecieveCommand(board_comm::Command command, board_comm::Address address)
         pingResponse = address;
     if (command == board_comm::READ_SINGLE)
         readOnce = true;
+    if (command == board_comm::START_LOGGING)
+        logging = true;
+    if (command == board_comm::STOP_LOGGING)
+        logging = false;
 }
 
 void setup()
@@ -33,5 +39,14 @@ void loop()
         board_comm::Reading reading = scales::readOnce();
         board_comm::transmit(board_comm::ANEMOMETER, board_comm::READING, reading);
         readOnce = false;
+    }
+
+    if (logging && scales::scalesReady())
+    {
+        board_comm::Reading reading = scales::readOnce();
+        board_comm::transmit(board_comm::ANEMOMETER, board_comm::READING, reading);
+        delay(10);
+        digitalWrite(LED_BUILTIN, ledToggle);
+        ledToggle = !ledToggle;
     }
 }

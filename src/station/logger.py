@@ -4,7 +4,6 @@ from time import sleep
 import os
 import re
 from threading import Thread
-import csv
 class Command:
     PING = bytes([1])
     READ_SINGLE = bytes([2])
@@ -84,7 +83,7 @@ def open_log_file():
             continue
 
         print('Log will be saved as {}'.format(log_path))
-        return open(log_path, 'a+')
+        return log_path
 
 def ping():
     start_time = time.time()
@@ -118,20 +117,19 @@ def read_single():
 
 stop_read = True
 logging_thread = Thread()
-def read_continuous(log_file):
+def read_continuous(log_path):
     global stop_read
     stop_read = False
-    csv_writer = csv.writer(log_file)
+    log_file = open(log_path, 'w')
 
     start_time = time.time()
     latest_time = start_time
 
-    ser.write(Command.READ_SINGLE) # TODO: change this to Command.START_LOGGING
+    ser.write(Command.START_LOGGING)
     while(True):
         if ser.inWaiting() >= 12:
             reading = read_loadcells()
-            csv_writer.writerow([round(time.time() - start_time, 6), reading.x, reading.y, reading.z])
-
+            log_file.write('{}, {}, {}, {}\n'.format(round(time.time() - start_time, 6), reading.x, reading.y, reading.z))
             latest_time = time.time()
 
         elif time.time() - latest_time > 2:
@@ -140,14 +138,17 @@ def read_continuous(log_file):
             stop_read = True
             return False
         elif stop_read:
+            ser.write(Command.STOP_LOGGING)
+            # TODO: Add stop comfirmation/flush recieve buffer
             log_file.close()
             print('Logging stopped')
             return True
 
 def start_logging():
-    log_file = open_log_file()
+    # TODO: Don't start logging if already logging
+    log_path = open_log_file()
     global logging_thread
-    logging_thread = Thread(target=read_continuous, args=(log_file,))
+    logging_thread = Thread(target=read_continuous, args=(log_path,))
     logging_thread.start()
 
 def stop_logging():
