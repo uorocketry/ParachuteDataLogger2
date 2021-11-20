@@ -11,13 +11,15 @@ class Command:
     STOP_LOGGING = bytes([4])
 
 class Reading:
-    def __init__(self, x, y, z):
+    def __init__(self, x, y, z, direction, speed):
         self.x = x
         self.y = y
         self.z = z
+        self.direction = direction
+        self.speed = speed
     
     def __str__(self):
-        return 'X:{0} Y:{1} Z:{2}'.format(self.x, self.y, self.z)
+        return 'X:{0} Y:{1} Z:{2} Dir:{3} Speed:{4}'.format(self.x, self.y, self.z, self.direction, self.speed)
 
 ser = serial.Serial()
 
@@ -98,18 +100,23 @@ def ping():
             print('Request timed out')
             return False
 
-def read_loadcells():
+def sensors_ready():
+    return ser.inWaiting() >= 16
+
+def read_sensors():
     return Reading(
         int.from_bytes(ser.read(4), byteorder='little', signed=True),
         int.from_bytes(ser.read(4), byteorder='little', signed=True),
-        int.from_bytes(ser.read(4), byteorder='little', signed=True))
+        int.from_bytes(ser.read(4), byteorder='little', signed=True),
+        int.from_bytes(ser.read(2), byteorder='little', signed=True),
+        int.from_bytes(ser.read(2), byteorder='little', signed=True))
 
 def read_single():
     start_time = time.time()
     ser.write(Command.READ_SINGLE)
     while(True):
-        if ser.inWaiting() >= 12:
-            print(read_loadcells())
+        if sensors_ready():
+            print(read_sensors())
             return True
         elif time.time() - start_time > 2:
             print('Request timed out')
@@ -127,8 +134,8 @@ def read_continuous(log_path):
 
     ser.write(Command.START_LOGGING)
     while(True):
-        if ser.inWaiting() >= 12:
-            reading = read_loadcells()
+        if sensors_ready():
+            reading = read_sensors()
             log_file.write('{}, {}, {}, {}\n'.format(round(time.time() - start_time, 6), reading.x, reading.y, reading.z))
             latest_time = time.time()
 

@@ -1,6 +1,9 @@
 #include <Arduino.h>
 #include <board_comm.h>
 
+#define DIRECTION_PIN A0
+#define SPEED_PIN A1
+
 bool sendReading = false;
 bool sendPingResponse = false;
 bool ledToggle = false;
@@ -40,6 +43,8 @@ void setup()
 {
     Serial.begin(115200);
     pinMode(LED_BUILTIN, OUTPUT);
+    pinMode(SPEED_PIN, INPUT);
+    pinMode(DIRECTION_PIN, INPUT);
     board_comm::init(board_comm::ANEMOMETER, onRecieveCommand);
 }
 
@@ -58,9 +63,14 @@ void writeSerial()
         digitalWrite(LED_BUILTIN, ledToggle);
         ledToggle = !ledToggle;
 
+        int16_t speed = analogRead(SPEED_PIN);
+        int16_t direction = analogRead(DIRECTION_PIN);
+
         Serial.write((uint8_t *)(&reading.x), 4);
         Serial.write((uint8_t *)(&reading.y), 4);
         Serial.write((uint8_t *)(&reading.z), 4);
+        Serial.write((uint8_t *)(&speed), 2);
+        Serial.write((uint8_t *)(&direction), 2);
         sendReading = false;
     }
 }
