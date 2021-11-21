@@ -18,8 +18,18 @@ class Reading:
         self.direction = direction
         self.speed = speed
     
+    def __add__(self, other):
+        return Reading(self.x + other.x, self.y + other.y, self.z + other.z, 
+            self.direction + other.direction, self.speed + other.speed)
+
+    def scale(self, coeff):
+        return Reading(self.x*coeff, self.y*coeff, self.z*coeff, 
+            self.direction*coeff, self.speed*coeff)
+
     def __str__(self):
-        return 'X:{0} Y:{1} Z:{2} Dir:{3} Speed:{4}'.format(self.x, self.y, self.z, self.direction, self.speed)
+        return 'X:{0} Y:{1} Z:{2} Dir:{3} Speed:{4}'.format(
+            str(int(self.x)).ljust(12), str(int(self.y)).ljust(12), str(int(self.z)).ljust(12), 
+            str(int(self.direction)).ljust(12), str(int(self.speed)).ljust(12))
 
 ser = serial.Serial()
 
@@ -35,24 +45,6 @@ def get_serial_ports():
             pass
     return ports
 
-def get_input():
-    while True:
-        result = input('Enter command:\n0: Ping\n1: Single Reading\n2: Start Logging\n3: Stop Logging\n4: Exit\n').strip()
-        if result == '0':
-            if ping():
-                print('Reply recieved from loadcell board')
-        elif result == '1':
-            read_single()
-        elif result == '2':
-            start_logging()
-        elif result == '3':
-            stop_logging()
-        elif result == '4':
-            return False # Exit
-        else:
-            continue # Invalid input, Continue get_input loop
-        return True # Keep looping
-
 def ask_yes_no(question):
     while True:
         response = input('{} (Y/N)\n'.format(question)).strip().capitalize()
@@ -60,6 +52,33 @@ def ask_yes_no(question):
             return True
         elif response == 'N':
             return False
+
+def ask_int(question, min_val, max_val):
+    while True:
+        response = input('{} (min:{} max:{})\n'.format(question, min_val, max_val)).strip()
+        if response.isdigit():
+            response_int = int(response)
+            if response_int >= min_val and response_int <= max_val:
+                return response_int
+
+def get_input():
+    while True:
+        result = input('Enter command:\n0: Ping\n1: Single Reading\n2: Average Reading\n3: Start Logging\n4: Exit\n').strip()
+        if result == '0':
+            if ping():
+                print('Reply recieved from loadcell board')
+        elif result == '1':
+            read_single()
+        elif result == '2':
+            read_average(ask_int('Enter number of samples', 2, 2000))
+        elif result == '3':
+            start_logging()
+
+        elif result == '4':
+            return False # Exit
+        else:
+            continue # Invalid input, Continue get_input loop
+        return True # Keep looping
 
 def open_log_file():
     log_dir = os.path.join(os.path.dirname(__file__), 'logs')
@@ -100,7 +119,7 @@ def ping():
             print('Request timed out')
             return False
 
-def sensors_ready():
+def sensor_data_ready():
     return ser.inWaiting() >= 16
 
 def read_sensors():
@@ -115,12 +134,31 @@ def read_single():
     start_time = time.time()
     ser.write(Command.READ_SINGLE)
     while(True):
-        if sensors_ready():
+        if sensor_data_ready():
             print(read_sensors())
             return True
         elif time.time() - start_time > 2:
             print('Request timed out')
             return False
+
+def read_average(samples):
+    latest_time = time.time()
+    ser.write(Command.START_LOGGING)
+    total = Reading(0, 0, 0, 0, 0)
+    i = 0
+    while i < samples:
+        if sensor_data_ready():
+            i += 1
+            total += read_sensors()
+            average = total.scale(1/i)
+            print(average, '{0}/{1}'.format(i, samples), end='\r')
+            latest_time = time.time()
+
+        elif time.time() - latest_time > 2:
+            print('Connection timed out')
+            return
+    ser.write(Command.STOP_LOGGING)
+    print()
 
 stop_read = True
 logging_thread = Thread()
@@ -134,9 +172,11 @@ def read_continuous(log_path):
 
     ser.write(Command.START_LOGGING)
     while(True):
-        if sensors_ready():
+        if sensor_data_ready():
             reading = read_sensors()
-            log_file.write('{}, {}, {}, {}\n'.format(round(time.time() - start_time, 6), reading.x, reading.y, reading.z))
+            read_time = round(time.time() - start_time, 6)
+            log_file.write('{}, {}, {}, {}\n'.format(read_time, reading.x, reading.y, reading.z))
+            print('Time:{}'.format(read_time).ljust(24), reading, end='\r')
             latest_time = time.time()
 
         elif time.time() - latest_time > 2:
