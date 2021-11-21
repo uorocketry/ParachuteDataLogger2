@@ -41,7 +41,7 @@ class Reading:
             '{:.2f}'.format(self.x).ljust(8), 
             '{:.2f}'.format(self.y).ljust(8), 
             '{:.2f}'.format(self.z).ljust(8), 
-            '{:.1f}'.format(self.direction).ljust(6), 
+            '{:.0f}'.format(self.direction).ljust(6), 
             '{:.1f}'.format(self.speed).ljust(6))
 
     def csv_line(self):
@@ -49,8 +49,8 @@ class Reading:
             self.time, self.x, self.y, self.z, 
             self.direction, self.speed)
 
-scale = Reading(x=0.01, y=0.01, z=0.01, direction=1, speed=1)
-offset = Reading(x=1400, y=1100, z=2500, direction=0, speed=0)
+scale = Reading(x=0.000168354, y=0.0000781784, z=0.0000786995, direction=0.452261, speed=0.0243137)
+offset = Reading(x=0, y=0, z=0, direction=-90, speed=-4.9)
 ser = serial.Serial()
 OFFSET_FILE = 'offsets.csv'
 
