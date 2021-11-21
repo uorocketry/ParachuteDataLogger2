@@ -18,10 +18,14 @@ class Reading:
         self.direction = direction
         self.speed = speed
         self.time = time
-    
+
     def __add__(self, other):
         return Reading(self.x + other.x, self.y + other.y, self.z + other.z, 
             self.direction + other.direction, self.speed + other.speed, self.time)
+
+    def __sub__(self, other):
+        return Reading(self.x - other.x, self.y - other.y, self.z - other.z, 
+            self.direction - other.direction, self.speed - other.speed, self.time)
 
     def __mul__(self, other):
         return Reading(self.x*other.x, self.y*other.y, self.z*other.z, 
@@ -48,6 +52,7 @@ class Reading:
 scale = Reading(x=0.01, y=0.01, z=0.01, direction=1, speed=1)
 offset = Reading(x=1400, y=1100, z=2500, direction=0, speed=0)
 ser = serial.Serial()
+OFFSET_FILE = 'offsets.csv'
 
 def get_serial_ports():
     ports = []
@@ -69,29 +74,33 @@ def ask_yes_no(question):
         elif response == 'N':
             return False
 
-def ask_int(question, min_val, max_val):
+def ask_int(question, min_val, max_val, default_val):
     while True:
-        response = input('{} (min:{} max:{})\n'.format(question, min_val, max_val)).strip()
+        response = input('{} (min:{} max:{} default:{})\n'.format(question, min_val, max_val, default_val)).strip()
         if response.isdigit():
             response_int = int(response)
             if response_int >= min_val and response_int <= max_val:
                 return response_int
+        elif response == '':
+            return default_val
 
 def get_input():
     while True:
-        result = input('Enter command:\n0: Ping\n1: Single Reading\n2: Average Reading\n3: Start Logging\n4: Exit\n').strip()
+        result = input('Enter command:\n0: Ping\n1: Single Reading\n2: Average Reading\n3: Tare\n4: Start Logging\n5: Exit\n').strip()
         if result == '0':
             if ping():
                 print('Reply recieved from loadcell board')
         elif result == '1':
             read_single()
         elif result == '2':
-            read_average(ask_int('Enter number of samples', 2, 2000))
+            read_average(ask_int('Enter number of samples', 2, 2000, 20))
         elif result == '3':
+            tare(ask_int('Enter number of samples', 2, 2000, 40))
+        elif result == '4':
             start_logging()
             input()
             stop_logging()
-        elif result == '4':
+        elif result == '5':
             return False # Exit
         else:
             continue # Invalid input, Continue get_input loop
@@ -176,9 +185,23 @@ def read_average(samples):
 
         elif time.time() - latest_time > 2:
             print('Connection timed out')
-            return
+            return (False, None)
     ser.write(Command.STOP_LOGGING)
     print()
+    return (True, average)
+
+def tare(samples):
+    reading = read_average(samples)
+    if reading[0]:
+        offset.x -= reading[1].x
+        offset.y -= reading[1].y
+        offset.z -= reading[1].z
+        print('Scale offsets set to: x={} y={} z={}'.format(offset.x, offset.y, offset.z))
+        try:
+            with open(OFFSET_FILE, 'w') as f:
+                f.write('{}, {}, {}'.format(offset.x, offset.y, offset.z))
+        except Exception as ex:
+            print('Failed to save scale offsets with error {}'.format(ex))
 
 stop_read = True
 logging_thread = Thread()
@@ -228,7 +251,25 @@ def stop_logging():
     else:
         print('Not currently logging')
 
+def load_offsets():
+    if os.path.exists(OFFSET_FILE):
+        try:
+            with open(OFFSET_FILE, 'r') as f:
+                values = f.read().split(',')
+                offset.x = float(values[0])
+                offset.y = float(values[1])
+                offset.z = float(values[2])
+                print('Scale offsets loaded as: x={} y={} z={}'.format(offset.x, offset.y, offset.z))
+                return
+        except Exception as ex:
+            print('Failed to load scale offsets with error {}'.format(ex))
+    else:
+        print('Scale offset file {} not found'.format(OFFSET_FILE))
+    print('Using default scale offsets: x={} y={} z={}'.format(offset.x, offset.y, offset.z))
+
 if __name__ == '__main__':
+    load_offsets()
+
     availablePorts = get_serial_ports()
     selectedPort = ''
     if len(availablePorts) == 0:
