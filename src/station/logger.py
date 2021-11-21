@@ -73,6 +73,8 @@ def get_input():
             read_average(ask_int('Enter number of samples', 2, 2000))
         elif result == '3':
             start_logging()
+            input()
+            stop_logging()
 
         elif result == '4':
             return False # Exit
@@ -183,18 +185,20 @@ def read_continuous(log_path):
             print('Connection timed out')
             log_file.close()
             stop_read = True
+            print()
             return False
         elif stop_read:
             ser.write(Command.STOP_LOGGING)
             # TODO: Add stop comfirmation/flush recieve buffer
             log_file.close()
-            print('Logging stopped')
+            print('\nLogging stopped')
             return True
 
 def start_logging():
     # TODO: Don't start logging if already logging
     log_path = open_log_file()
     global logging_thread
+    print('Press enter to stop logging')
     logging_thread = Thread(target=read_continuous, args=(log_path,))
     logging_thread.start()
 
