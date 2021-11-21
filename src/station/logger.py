@@ -11,26 +11,42 @@ class Command:
     STOP_LOGGING = bytes([4])
 
 class Reading:
-    def __init__(self, x, y, z, direction, speed):
+    def __init__(self, x, y, z, direction, speed, time=0.0):
         self.x = x
         self.y = y
         self.z = z
         self.direction = direction
         self.speed = speed
+        self.time = time
     
     def __add__(self, other):
         return Reading(self.x + other.x, self.y + other.y, self.z + other.z, 
-            self.direction + other.direction, self.speed + other.speed)
+            self.direction + other.direction, self.speed + other.speed, self.time)
+
+    def __mul__(self, other):
+        return Reading(self.x*other.x, self.y*other.y, self.z*other.z, 
+            self.direction*other.direction, self.speed*other.speed, self.time)
 
     def scale(self, coeff):
         return Reading(self.x*coeff, self.y*coeff, self.z*coeff, 
-            self.direction*coeff, self.speed*coeff)
+            self.direction*coeff, self.speed*coeff, self.time)
 
     def __str__(self):
-        return 'X:{0} Y:{1} Z:{2} Dir:{3} Speed:{4}'.format(
-            str(int(self.x)).ljust(12), str(int(self.y)).ljust(12), str(int(self.z)).ljust(12), 
-            str(int(self.direction)).ljust(12), str(int(self.speed)).ljust(12))
+        return 'Time:{} X:{} Y:{} Z:{} Dir:{} Speed:{}'.format(
+            '{:.3f}'.format(self.time).ljust(8), 
+            '{:.2f}'.format(self.x).ljust(8), 
+            '{:.2f}'.format(self.y).ljust(8), 
+            '{:.2f}'.format(self.z).ljust(8), 
+            '{:.1f}'.format(self.direction).ljust(6), 
+            '{:.1f}'.format(self.speed).ljust(6))
 
+    def csv_line(self):
+        return '{:.3f}, {:.2f}, {:.2f}, {:.2f}, {:.1f}, {:.1f}\n'.format(
+            self.time, self.x, self.y, self.z, 
+            self.direction, self.speed)
+
+scale = Reading(x=0.01, y=0.01, z=0.01, direction=1, speed=1)
+offset = Reading(x=1400, y=1100, z=2500, direction=0, speed=0)
 ser = serial.Serial()
 
 def get_serial_ports():
@@ -75,7 +91,6 @@ def get_input():
             start_logging()
             input()
             stop_logging()
-
         elif result == '4':
             return False # Exit
         else:
@@ -124,13 +139,16 @@ def ping():
 def sensor_data_ready():
     return ser.inWaiting() >= 16
 
-def read_sensors():
-    return Reading(
+def read_sensors(raw=False):
+    raw_reading = Reading(
         int.from_bytes(ser.read(4), byteorder='little', signed=True),
         int.from_bytes(ser.read(4), byteorder='little', signed=True),
         int.from_bytes(ser.read(4), byteorder='little', signed=True),
         int.from_bytes(ser.read(2), byteorder='little', signed=True),
         int.from_bytes(ser.read(2), byteorder='little', signed=True))
+    if raw:
+        return raw_reading
+    return raw_reading*scale + offset
 
 def read_single():
     start_time = time.time()
@@ -176,9 +194,9 @@ def read_continuous(log_path):
     while(True):
         if sensor_data_ready():
             reading = read_sensors()
-            read_time = round(time.time() - start_time, 6)
-            log_file.write('{}, {}, {}, {}\n'.format(read_time, reading.x, reading.y, reading.z))
-            print('Time:{}'.format(read_time).ljust(24), reading, end='\r')
+            reading.time = round(time.time() - start_time, 6)
+            log_file.write(reading.csv_line())
+            print(reading, end='\r')
             latest_time = time.time()
 
         elif time.time() - latest_time > 2:
