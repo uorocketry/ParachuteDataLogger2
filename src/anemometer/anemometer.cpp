@@ -71,6 +71,7 @@ void writeSerial()
         Serial.write((uint8_t *)(&reading.z), 4);
         Serial.write((uint8_t *)(&speed), 2);
         Serial.write((uint8_t *)(&direction), 2);
+        Serial.write((uint8_t)72);
         sendReading = false;
     }
 }

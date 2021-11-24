@@ -49,8 +49,8 @@ class Reading:
             self.time, self.x, self.y, self.z, 
             self.direction, self.speed)
 
-scale = Reading(x=0.000168354, y=0.0000781784, z=0.0000786995, direction=0.452261, speed=0.0243137)
-offset = Reading(x=0, y=0, z=0, direction=-90, speed=-4.9)
+scale = Reading(x=0.000168354, y=0.0000781784, z=0.0000786995, direction=0.452261, speed=0.05)
+offset = Reading(x=0, y=0, z=0, direction=-90, speed=-10.4)
 ser = serial.Serial()
 OFFSET_FILE = 'offsets.csv'
 
@@ -146,15 +146,20 @@ def ping():
             return False
 
 def sensor_data_ready():
-    return ser.inWaiting() >= 16
+    return ser.inWaiting() >= 17
 
 def read_sensors(raw=False):
     raw_reading = Reading(
         int.from_bytes(ser.read(4), byteorder='little', signed=True),
         int.from_bytes(ser.read(4), byteorder='little', signed=True),
         int.from_bytes(ser.read(4), byteorder='little', signed=True),
-        int.from_bytes(ser.read(2), byteorder='little', signed=True),
-        int.from_bytes(ser.read(2), byteorder='little', signed=True))
+        int.from_bytes(ser.read(2), byteorder='little', signed=False),
+        int.from_bytes(ser.read(2), byteorder='little', signed=False))
+    if int.from_bytes(ser.read(1), byteorder='little', signed=False) != 72:
+        # missed end byte, flush buffer
+        while ser.inWaiting() > 0:
+            ser.read()
+        return Reading(0, 0, 0, 0, 0)
     if raw:
         return raw_reading
     return raw_reading*scale + offset
@@ -236,7 +241,6 @@ def read_continuous(log_path):
             return True
 
 def start_logging():
-    # TODO: Don't start logging if already logging
     log_path = open_log_file()
     global logging_thread
     print('Press enter to stop logging')
