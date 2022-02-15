@@ -4,6 +4,8 @@ from time import sleep
 import os
 import re
 from threading import Thread
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 class Command:
     PING = bytes([1])
     READ_SINGLE = bytes([2])
@@ -54,6 +56,14 @@ offset = Reading(x=0, y=0, z=0, direction=-90, speed=-10.4)
 ser = serial.Serial()
 OFFSET_FILE = 'offsets.csv'
 
+SHOW_PLOT = True
+SAMPLE_RATE = 10 # Hz
+PLOT_LENGTH = 20 # s
+FORCE_DEFAULT_LIMITS = [-20, 20] # N
+SPEED_DEFAULT_LIMITS = [0, 20] # m/s
+PLOT_INTERVAL = 400 # ms
+PLOT_QUEUE_LENGTH = PLOT_LENGTH*SAMPLE_RATE
+
 def get_serial_ports():
     ports = []
     for port_num in range(256):
@@ -98,7 +108,8 @@ def get_input():
             tare(ask_int('Enter number of samples', 2, 2000, 40))
         elif result == '4':
             start_logging()
-            input()
+            if not SHOW_PLOT:
+                input()
             stop_logging()
         elif result == '5':
             return False # Exit
@@ -208,6 +219,41 @@ def tare(samples):
         except Exception as ex:
             print('Failed to save scale offsets with error {}'.format(ex))
 
+fig = plt.figure()
+force_plot = fig.add_subplot(2, 1, 1)
+speed_plot = fig.add_subplot(2, 1, 2)
+plot_queue = []
+def plot(i):
+    while len(plot_queue) > PLOT_QUEUE_LENGTH:
+        plot_queue.pop(0)
+
+    t = [reading.time for reading in plot_queue]
+    fx = [reading.x for reading in plot_queue]
+    fy = [reading.y for reading in plot_queue]
+    fz = [reading.z for reading in plot_queue]
+    v = [reading.speed for reading in plot_queue]
+    force_plot_limits = [
+        min(min(fx), min(fy), min(fz), FORCE_DEFAULT_LIMITS[0]),
+        max(max(fx), max(fy), max(fz), FORCE_DEFAULT_LIMITS[1])]
+    speed_plot_limits = [
+        min(min(v), SPEED_DEFAULT_LIMITS[0]),
+        max(max(v), SPEED_DEFAULT_LIMITS[1])]
+
+    force_plot.clear()
+    force_plot.plot(t, fx, label='Axial')
+    force_plot.plot(t, fy, label='Vertical')
+    force_plot.plot(t, fz, label='Horizontal')
+    force_plot.set_ylim(force_plot_limits)
+    force_plot.legend(loc='upper left')
+    force_plot.set_xlabel('Time (s)')
+    force_plot.set_ylabel('Force (N)')
+
+    speed_plot.clear()
+    speed_plot.plot(t, v, label='Air Speed')
+    speed_plot.set_ylim(speed_plot_limits)
+    speed_plot.set_xlabel('Time (s)')
+    speed_plot.set_ylabel('Velocity (m/s)')
+
 stop_read = True
 logging_thread = Thread()
 def read_continuous(log_path):
@@ -226,6 +272,8 @@ def read_continuous(log_path):
             log_file.write(reading.csv_line())
             print(reading, end='\r')
             latest_time = time.time()
+            if SHOW_PLOT:
+                plot_queue.append(reading)
 
         elif time.time() - latest_time > 2:
             print('Connection timed out')
@@ -243,9 +291,22 @@ def read_continuous(log_path):
 def start_logging():
     log_path = open_log_file()
     global logging_thread
-    print('Press enter to stop logging')
+    print('Close plot to stop logging' if SHOW_PLOT else 'Press enter to stop logging')
     logging_thread = Thread(target=read_continuous, args=(log_path,))
     logging_thread.start()
+
+    if SHOW_PLOT:
+        global fig
+        global force_plot
+        global speed_plot
+        plot_queue.clear()
+        plt.close('all')
+        fig = plt.figure()
+        fig.canvas.manager.set_window_title('ParachuteDataLogger2')
+        force_plot = fig.add_subplot(2, 1, 1)
+        speed_plot = fig.add_subplot(2, 1, 2)
+        _ = animation.FuncAnimation(fig, plot, interval=PLOT_INTERVAL)
+        plt.show()
 
 def stop_logging():
     global stop_read
