@@ -51,8 +51,8 @@ class Reading:
             self.time, self.x, self.y, self.z, 
             self.direction, self.speed)
 
-scale = Reading(x=0.000168354, y=0.0000781784, z=0.0000786995, direction=0.452261, speed=0.05)
-offset = Reading(x=0, y=0, z=0, direction=-90, speed=-10.4)
+scale = Reading(x=-0.000168354, y=-0.0000781784, z=-0.0000786995, direction=0.452261, speed=0.0487)
+offset = Reading(x=0, y=0, z=0, direction=-90, speed=-9.9)
 ser = serial.Serial()
 OFFSET_FILE = 'offsets.csv'
 
